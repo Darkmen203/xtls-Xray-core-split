@@ -148,6 +148,11 @@ func Dial(ctx context.Context, dest net.Destination, streamSettings *internet.Me
 			httpHeaders.Set(httpHeader.Name, httpHeaderValue)
 		}
 	}
+	// GFW-Knocker
+	uagent := httpHeaders.Get("User-Agent")
+	if uagent == "" {
+		httpHeaders.Set("User-Agent", "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.6613.99 Mobile Safari/537.36")
+	}
 
 	request := &http.Request{
 		Method: httpMethod,

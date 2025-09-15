@@ -3,10 +3,12 @@ package freedom
 //go:generate go run github.com/xtls/xray-core/common/errors/errorgen
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"io"
 	"math/big"
+	"regexp"
 	"time"
 
 	"github.com/pires/go-proxyproto"
@@ -441,7 +443,30 @@ type FragmentWriter struct {
 
 func (f *FragmentWriter) Write(b []byte) (int, error) {
 	f.count++
+	if f.fragment.FakeHost {
+		if f.count == 1 {
+			h1_header := f.fragment.Host1Header
+			h1_domain := f.fragment.Host1Domain
+			h2_header := f.fragment.Host2Header
+			h2_domain := f.fragment.Host2Domain
 
+			// find the old host case-insensitive
+			re := regexp.MustCompile("(?i)(\r\nHost:.*\r\n)")
+			firstMatch := re.FindSubmatch(b)
+			var new_b []byte
+			if len(firstMatch) > 1 {
+				old_h := firstMatch[1]
+				new_h := []byte("\r\n" + h1_header + h1_domain + string(old_h) + h2_header + h2_domain + "\r\n")
+				new_b = bytes.Replace(b, old_h, new_h, 1)
+			} else {
+				new_b = b
+			}
+			return f.writer.Write(new_b)
+
+		} else {
+			return f.writer.Write(b)
+		}
+	}
 	if f.fragment.PacketsFrom == 0 && f.fragment.PacketsTo == 1 {
 		if f.count != 1 || len(b) <= 5 || b[0] != 22 {
 			return f.writer.Write(b)
@@ -452,7 +477,10 @@ func (f *FragmentWriter) Write(b []byte) (int, error) {
 		}
 		data := b[5:recordLen]
 		buf := make([]byte, 1024)
-		var hello []byte
+		queue := make([]byte, 2048)                     //gfwknocker
+		n_queue := int(randBetween(int64(1), int64(4))) //gfwknocker
+		L_queue := 0                                    //gfwknocker
+		c_queue := 0                                    //gfwknocker
 		for from := 0; ; {
 			to := from + int(randBetween(int64(f.fragment.LengthMin), int64(f.fragment.LengthMax)))
 			if to > len(data) {
@@ -464,18 +492,39 @@ func (f *FragmentWriter) Write(b []byte) (int, error) {
 			from = to
 			buf[3] = byte(l >> 8)
 			buf[4] = byte(l)
-			if f.fragment.IntervalMax == 0 { // combine fragmented tlshello if interval is 0
-				hello = append(hello, buf[:5+l]...)
-			} else {
-				_, err := f.writer.Write(buf[:5+l])
-				time.Sleep(time.Duration(randBetween(int64(f.fragment.IntervalMin), int64(f.fragment.IntervalMax))) * time.Millisecond)
-				if err != nil {
-					return 0, err
+			//gfwknocker {{{{
+			if c_queue < n_queue {
+				if l > 0 {
+					copy(queue[L_queue:], buf[:5+l])
+					L_queue = L_queue + 5 + l
 				}
+				c_queue = c_queue + 1
+			} else {
+				if l > 0 {
+					copy(queue[L_queue:], buf[:5+l])
+					L_queue = L_queue + 5 + l
+				}
+
+				if L_queue > 0 {
+					_, err := f.writer.Write(queue[:L_queue])
+					time.Sleep(time.Duration(randBetween(int64(f.fragment.IntervalMin), int64(f.fragment.IntervalMax))) * time.Millisecond)
+					if err != nil {
+						return 0, err
+					}
+				}
+
+				L_queue = 0
+				c_queue = 0
+
 			}
+
 			if from == len(data) {
-				if len(hello) > 0 {
-					_, err := f.writer.Write(hello)
+				if L_queue > 0 {
+					_, err := f.writer.Write(queue[:L_queue])
+					time.Sleep(time.Duration(randBetween(int64(f.fragment.IntervalMin), int64(f.fragment.IntervalMax))) * time.Millisecond)
+					L_queue = 0
+					c_queue = 0
+
 					if err != nil {
 						return 0, err
 					}
@@ -488,6 +537,8 @@ func (f *FragmentWriter) Write(b []byte) (int, error) {
 				}
 				return len(b), nil
 			}
+
+			//GFW-Knocker}}}}
 		}
 	}
 
