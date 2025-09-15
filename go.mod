@@ -1,6 +1,6 @@
 module github.com/xtls/xray-core
 
-go 1.21.4
+go 1.23
 
 require (
 	github.com/OmarTariq612/goech v0.0.0-20240405204721-8e2e1dafd3a0
@@ -28,7 +28,7 @@ require (
 	golang.org/x/sys v0.25.0
 	golang.zx2c4.com/wireguard v0.0.0-20231211153847-12269c276173
 	google.golang.org/grpc v1.67.0
-	google.golang.org/protobuf v1.34.2
+	google.golang.org/protobuf v1.36.9
 	gvisor.dev/gvisor v0.0.0-20231202080848-1f7806d17489
 	h12.io/socks v1.0.3
 	lukechampine.com/blake3 v1.3.0
@@ -38,6 +38,7 @@ require (
 	github.com/andybalholm/brotli v1.1.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dgryski/go-metro v0.0.0-20211217172704-adc40b04c140 // indirect
+	github.com/francoispqt/gojay v1.2.13 // indirect
 	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
 	github.com/google/btree v1.1.2 // indirect
 	github.com/google/pprof v0.0.0-20240528025155-186aa0362fba // indirect
