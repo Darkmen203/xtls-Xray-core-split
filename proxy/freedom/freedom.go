@@ -1,14 +1,10 @@
 package freedom
 
-//go:generate go run github.com/xtls/xray-core/common/errors/errorgen
-
 import (
-	"bytes"
 	"context"
 	"crypto/rand"
 	"io"
 	"math/big"
-	"regexp"
 	"time"
 
 	"github.com/pires/go-proxyproto"
@@ -71,9 +67,6 @@ func (h *Handler) Init(config *Config, pm policy.Manager, d dns.Client) error {
 
 func (h *Handler) policy() policy.Session {
 	p := h.policyManager.ForLevel(h.config.UserLevel)
-	if h.config.Timeout > 0 && h.config.UserLevel == 0 {
-		p.Timeouts.ConnectionIdle = time.Duration(h.config.Timeout) * time.Second
-	}
 	return p
 }
 
@@ -210,12 +203,11 @@ func (h *Handler) Process(ctx context.Context, link *transport.Link, dialer inte
 			}
 		} else {
 			writer = NewPacketWriter(conn, h, ctx, UDPOverride)
-			if h.config.Noise != nil {
-				errors.LogDebug(ctx, "NOISE", h.config.Noise.StrNoise, h.config.Noise.LengthMin, h.config.Noise.LengthMax,
-					h.config.Noise.DelayMin, h.config.Noise.DelayMax)
+			if h.config.Noises != nil {
+				errors.LogDebug(ctx, "NOISE", h.config.Noises)
 				writer = &NoisePacketWriter{
 					Writer:      writer,
-					noise:       h.config.Noise,
+					noises:      h.config.Noises,
 					firstWrite:  true,
 					UDPOverride: UDPOverride,
 				}
@@ -398,12 +390,12 @@ func (w *PacketWriter) WriteMultiBuffer(mb buf.MultiBuffer) error {
 
 type NoisePacketWriter struct {
 	buf.Writer
-	noise       *Noise
+	noises      []*Noise
 	firstWrite  bool
 	UDPOverride net.Destination
 }
 
-// MultiBuffer writer with Noise in first packet
+// MultiBuffer writer with Noise before first packet
 func (w *NoisePacketWriter) WriteMultiBuffer(mb buf.MultiBuffer) error {
 	if w.firstWrite {
 		w.firstWrite = false
@@ -413,22 +405,23 @@ func (w *NoisePacketWriter) WriteMultiBuffer(mb buf.MultiBuffer) error {
 		}
 		var noise []byte
 		var err error
-		//User input string
-		if w.noise.StrNoise != "" {
-			noise = []byte(w.noise.StrNoise)
-		} else {
-			//Random noise
-			noise, err = GenerateRandomBytes(randBetween(int64(w.noise.LengthMin),
-				int64(w.noise.LengthMax)))
-		}
+		for _, n := range w.noises {
+			//User input string or base64 encoded string
+			if n.StrNoise != nil {
+				noise = n.StrNoise
+			} else {
+				//Random noise
+				noise, err = GenerateRandomBytes(randBetween(int64(n.LengthMin),
+					int64(n.LengthMax)))
+			}
+			if err != nil {
+				return err
+			}
+			w.Writer.WriteMultiBuffer(buf.MultiBuffer{buf.FromBytes(noise)})
 
-		if err != nil {
-			return err
-		}
-		w.Writer.WriteMultiBuffer(buf.MultiBuffer{buf.FromBytes(noise)})
-
-		if w.noise.DelayMin != 0 {
-			time.Sleep(time.Duration(randBetween(int64(w.noise.DelayMin), int64(w.noise.DelayMax))) * time.Millisecond)
+			if n.DelayMin != 0 {
+				time.Sleep(time.Duration(randBetween(int64(n.DelayMin), int64(n.DelayMax))) * time.Millisecond)
+			}
 		}
 
 	}
@@ -443,30 +436,7 @@ type FragmentWriter struct {
 
 func (f *FragmentWriter) Write(b []byte) (int, error) {
 	f.count++
-	if f.fragment.FakeHost {
-		if f.count == 1 {
-			h1_header := f.fragment.Host1Header
-			h1_domain := f.fragment.Host1Domain
-			h2_header := f.fragment.Host2Header
-			h2_domain := f.fragment.Host2Domain
 
-			// find the old host case-insensitive
-			re := regexp.MustCompile("(?i)(\r\nHost:.*\r\n)")
-			firstMatch := re.FindSubmatch(b)
-			var new_b []byte
-			if len(firstMatch) > 1 {
-				old_h := firstMatch[1]
-				new_h := []byte("\r\n" + h1_header + h1_domain + string(old_h) + h2_header + h2_domain + "\r\n")
-				new_b = bytes.Replace(b, old_h, new_h, 1)
-			} else {
-				new_b = b
-			}
-			return f.writer.Write(new_b)
-
-		} else {
-			return f.writer.Write(b)
-		}
-	}
 	if f.fragment.PacketsFrom == 0 && f.fragment.PacketsTo == 1 {
 		if f.count != 1 || len(b) <= 5 || b[0] != 22 {
 			return f.writer.Write(b)
@@ -477,10 +447,7 @@ func (f *FragmentWriter) Write(b []byte) (int, error) {
 		}
 		data := b[5:recordLen]
 		buf := make([]byte, 1024)
-		queue := make([]byte, 2048)                     //gfwknocker
-		n_queue := int(randBetween(int64(1), int64(4))) //gfwknocker
-		L_queue := 0                                    //gfwknocker
-		c_queue := 0                                    //gfwknocker
+		var hello []byte
 		for from := 0; ; {
 			to := from + int(randBetween(int64(f.fragment.LengthMin), int64(f.fragment.LengthMax)))
 			if to > len(data) {
@@ -492,39 +459,18 @@ func (f *FragmentWriter) Write(b []byte) (int, error) {
 			from = to
 			buf[3] = byte(l >> 8)
 			buf[4] = byte(l)
-			//gfwknocker {{{{
-			if c_queue < n_queue {
-				if l > 0 {
-					copy(queue[L_queue:], buf[:5+l])
-					L_queue = L_queue + 5 + l
-				}
-				c_queue = c_queue + 1
+			if f.fragment.IntervalMax == 0 { // combine fragmented tlshello if interval is 0
+				hello = append(hello, buf[:5+l]...)
 			} else {
-				if l > 0 {
-					copy(queue[L_queue:], buf[:5+l])
-					L_queue = L_queue + 5 + l
+				_, err := f.writer.Write(buf[:5+l])
+				time.Sleep(time.Duration(randBetween(int64(f.fragment.IntervalMin), int64(f.fragment.IntervalMax))) * time.Millisecond)
+				if err != nil {
+					return 0, err
 				}
-
-				if L_queue > 0 {
-					_, err := f.writer.Write(queue[:L_queue])
-					time.Sleep(time.Duration(randBetween(int64(f.fragment.IntervalMin), int64(f.fragment.IntervalMax))) * time.Millisecond)
-					if err != nil {
-						return 0, err
-					}
-				}
-
-				L_queue = 0
-				c_queue = 0
-
 			}
-
 			if from == len(data) {
-				if L_queue > 0 {
-					_, err := f.writer.Write(queue[:L_queue])
-					time.Sleep(time.Duration(randBetween(int64(f.fragment.IntervalMin), int64(f.fragment.IntervalMax))) * time.Millisecond)
-					L_queue = 0
-					c_queue = 0
-
+				if len(hello) > 0 {
+					_, err := f.writer.Write(hello)
 					if err != nil {
 						return 0, err
 					}
@@ -537,8 +483,6 @@ func (f *FragmentWriter) Write(b []byte) (int, error) {
 				}
 				return len(b), nil
 			}
-
-			//GFW-Knocker}}}}
 		}
 	}
 
