@@ -48,9 +48,7 @@ func TestXrayConfig(t *testing.T) {
 					"streamSettings": {
 						"network": "ws",
 						"wsSettings": {
-							"headers": {
-								"host": "example.domain"
-							},
+							"host": "example.domain",
 							"path": ""
 						},
 						"tlsSettings": {
@@ -60,10 +58,6 @@ func TestXrayConfig(t *testing.T) {
 					},
 					"protocol": "vmess",
 					"port": "443-500",
-					"allocate": {
-						"strategy": "random",
-						"concurrency": 3
-					},
 					"settings": {
 						"clients": [
 							{
@@ -79,7 +73,6 @@ func TestXrayConfig(t *testing.T) {
 							"ip": [
 								"10.0.0.0/8"
 							],
-							"type": "field",
 							"outboundTag": "blocked"
 						}
 					]
@@ -126,12 +119,6 @@ func TestXrayConfig(t *testing.T) {
 								From: 443,
 								To:   500,
 							}}},
-							AllocationStrategy: &proxyman.AllocationStrategy{
-								Type: proxyman.AllocationStrategy_Random,
-								Concurrency: &proxyman.AllocationStrategy_AllocationStrategyConcurrency{
-									Value: 3,
-								},
-							},
 							StreamSettings: &internet.StreamConfig{
 								ProtocolName: "websocket",
 								TransportSettings: []*internet.TransportConfig{
@@ -139,9 +126,6 @@ func TestXrayConfig(t *testing.T) {
 										ProtocolName: "websocket",
 										Settings: serial.ToTypedMessage(&websocket.Config{
 											Host: "example.domain",
-											Header: map[string]string{
-												"host": "example.domain",
-											},
 										}),
 									},
 								},

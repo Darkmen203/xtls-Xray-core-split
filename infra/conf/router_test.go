@@ -2,6 +2,7 @@ package conf_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -18,21 +19,44 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-func init() {
-	wd, err := os.Getwd()
-	common.Must(err)
-
-	if _, err := os.Stat(platform.GetAssetLocation("geoip.dat")); err != nil && os.IsNotExist(err) {
-		common.Must(filesystem.CopyFile(platform.GetAssetLocation("geoip.dat"), filepath.Join(wd, "..", "..", "resources", "geoip.dat")))
+func getAssetPath(file string) (string, error) {
+	path := platform.GetAssetLocation(file)
+	_, err := os.Stat(path)
+	if os.IsNotExist(err) {
+		path := filepath.Join("..", "..", "resources", file)
+		_, err := os.Stat(path)
+		if os.IsNotExist(err) {
+			return "", fmt.Errorf("can't find %s in standard asset locations or {project_root}/resources", file)
+		}
+		if err != nil {
+			return "", fmt.Errorf("can't stat %s: %v", path, err)
+		}
+		return path, nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("can't stat %s: %v", path, err)
 	}
 
-	os.Setenv("xray.location.asset", wd)
+	return path, nil
 }
 
 func TestToCidrList(t *testing.T) {
-	t.Log(os.Getenv("xray.location.asset"))
+	tempDir, err := os.MkdirTemp("", "test-")
+	if err != nil {
+		t.Fatalf("can't create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
 
-	common.Must(filesystem.CopyFile(platform.GetAssetLocation("geoiptestrouter.dat"), "geoip.dat"))
+	geoipPath, err := getAssetPath("geoip.dat")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	common.Must(filesystem.CopyFile(filepath.Join(tempDir, "geoip.dat"), geoipPath))
+	common.Must(filesystem.CopyFile(filepath.Join(tempDir, "geoiptestrouter.dat"), geoipPath))
+
+	os.Setenv("xray.location.asset", tempDir)
+	defer os.Unsetenv("xray.location.asset")
 
 	ips := StringList([]string{
 		"geoip:us",
@@ -44,7 +68,7 @@ func TestToCidrList(t *testing.T) {
 		"ext-ip:geoiptestrouter.dat:!ca",
 	})
 
-	_, err := ToCidrList(ips)
+	_, err = ToCidrList(ips)
 	if err != nil {
 		t.Fatalf("Failed to parse geoip list, got %s", err)
 	}
@@ -67,7 +91,6 @@ func TestRouterConfig(t *testing.T) {
 				"domainStrategy": "AsIs",
 				"rules": [
 					{
-						"type": "field",
 						"domain": [
 							"baidu.com",
 							"qq.com"
@@ -75,18 +98,15 @@ func TestRouterConfig(t *testing.T) {
 						"outboundTag": "direct"
 					},
 					{
-						"type": "field",
 						"ip": [
 							"10.0.0.0/8",
 							"::1/128"
 						],
 						"outboundTag": "test"
 					},{
-						"type": "field",
 						"port": "53, 443, 1000-2000",
 						"outboundTag": "test"
 					},{
-						"type": "field",
 						"port": 123,
 						"outboundTag": "test"
 					}
@@ -225,7 +245,6 @@ func TestRouterConfig(t *testing.T) {
 				"domainStrategy": "IPIfNonMatch",
 				"rules": [
 					{
-						"type": "field",
 						"domain": [
 							"baidu.com",
 							"qq.com"
@@ -233,7 +252,6 @@ func TestRouterConfig(t *testing.T) {
 						"outboundTag": "direct"
 					},
 					{
-						"type": "field",
 						"ip": [
 							"10.0.0.0/8",
 							"::1/128"

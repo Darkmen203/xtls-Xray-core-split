@@ -47,11 +47,11 @@ var (
 )
 
 func (p *pipe) Len() int32 {
-    data := p.data
-    if data == nil {
-        return 0
-    }
-    return data.Len()
+	data := p.data
+	if data == nil {
+		return 0
+	}
+	return data.Len()
 }
 
 func (p *pipe) getState(forRead bool) error {
@@ -200,16 +200,19 @@ func (p *pipe) Interrupt() {
 	p.Lock()
 	defer p.Unlock()
 
+	if !p.data.IsEmpty() {
+		buf.ReleaseMulti(p.data)
+		p.data = nil
+		if p.state == closed {
+			p.state = errord
+		}
+	}
+
 	if p.state == closed || p.state == errord {
 		return
 	}
 
 	p.state = errord
-
-	if !p.data.IsEmpty() {
-		buf.ReleaseMulti(p.data)
-		p.data = nil
-	}
 
 	common.Must(p.done.Close())
 }

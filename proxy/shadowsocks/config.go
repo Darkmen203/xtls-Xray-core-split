@@ -2,7 +2,6 @@ package shadowsocks
 
 import (
 	"bytes"
-	"crypto/aes"
 	"crypto/cipher"
 	"crypto/md5"
 	"crypto/sha1"
@@ -22,7 +21,7 @@ import (
 // MemoryAccount is an account type converted from Account.
 type MemoryAccount struct {
 	Cipher     Cipher
-	CipherType CipherType 
+	CipherType CipherType
 	Key        []byte
 	Password   string
 
@@ -42,8 +41,8 @@ func (a *MemoryAccount) Equals(another protocol.Account) bool {
 func (a *MemoryAccount) ToProto() proto.Message {
 	return &Account{
 		CipherType: a.CipherType,
-		Password: a.Password,
-		IvCheck: a.replayFilter != nil,
+		Password:   a.Password,
+		IvCheck:    a.replayFilter != nil,
 	}
 }
 
@@ -58,11 +57,7 @@ func (a *MemoryAccount) CheckIV(iv []byte) error {
 }
 
 func createAesGcm(key []byte) cipher.AEAD {
-	block, err := aes.NewCipher(key)
-	common.Must(err)
-	gcm, err := cipher.NewGCM(block)
-	common.Must(err)
-	return gcm
+	return crypto.NewAesGcm(key)
 }
 
 func createChaCha20Poly1305(key []byte) cipher.AEAD {
@@ -117,10 +112,10 @@ func (a *Account) AsAccount() (protocol.Account, error) {
 		return nil, errors.New("failed to get cipher").Base(err)
 	}
 	return &MemoryAccount{
-		Cipher: Cipher,
+		Cipher:     Cipher,
 		CipherType: a.CipherType,
-		Key:    passwordToCipherKey([]byte(a.Password), Cipher.KeySize()),
-		Password: a.Password,
+		Key:        passwordToCipherKey([]byte(a.Password), Cipher.KeySize()),
+		Password:   a.Password,
 		replayFilter: func() antireplay.GeneralizedReplayFilter {
 			if a.IvCheck {
 				return antireplay.NewBloomRing()

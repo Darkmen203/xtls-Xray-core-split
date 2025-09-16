@@ -85,8 +85,8 @@ func TestDokodemoTCP(t *testing.T) {
 						Listen:   net.NewIPOrDomain(net.LocalHostIP),
 					}),
 					ProxySettings: serial.ToTypedMessage(&dokodemo.Config{
-						Address: net.NewIPOrDomain(dest.Address),
-						Port:    uint32(dest.Port),
+						Address:  net.NewIPOrDomain(dest.Address),
+						Port:     uint32(dest.Port),
 						Networks: []net.Network{net.Network_TCP},
 					}),
 				},
@@ -94,17 +94,13 @@ func TestDokodemoTCP(t *testing.T) {
 			Outbound: []*core.OutboundHandlerConfig{
 				{
 					ProxySettings: serial.ToTypedMessage(&outbound.Config{
-						Receiver: []*protocol.ServerEndpoint{
-							{
-								Address: net.NewIPOrDomain(net.LocalHostIP),
-								Port:    uint32(serverPort),
-								User: []*protocol.User{
-									{
-										Account: serial.ToTypedMessage(&vmess.Account{
-											Id: userID.String(),
-										}),
-									},
-								},
+						Receiver: &protocol.ServerEndpoint{
+							Address: net.NewIPOrDomain(net.LocalHostIP),
+							Port:    uint32(serverPort),
+							User:    &protocol.User{
+								Account: serial.ToTypedMessage(&vmess.Account{
+									Id: userID.String(),
+								}),
 							},
 						},
 					}),
@@ -181,8 +177,8 @@ func TestDokodemoUDP(t *testing.T) {
 						Listen:   net.NewIPOrDomain(net.LocalHostIP),
 					}),
 					ProxySettings: serial.ToTypedMessage(&dokodemo.Config{
-						Address: net.NewIPOrDomain(dest.Address),
-						Port:    uint32(dest.Port),
+						Address:  net.NewIPOrDomain(dest.Address),
+						Port:     uint32(dest.Port),
 						Networks: []net.Network{net.Network_UDP},
 					}),
 				},
@@ -190,17 +186,13 @@ func TestDokodemoUDP(t *testing.T) {
 			Outbound: []*core.OutboundHandlerConfig{
 				{
 					ProxySettings: serial.ToTypedMessage(&outbound.Config{
-						Receiver: []*protocol.ServerEndpoint{
-							{
-								Address: net.NewIPOrDomain(net.LocalHostIP),
-								Port:    uint32(serverPort),
-								User: []*protocol.User{
-									{
-										Account: serial.ToTypedMessage(&vmess.Account{
-											Id: userID.String(),
-										}),
-									},
-								},
+						Receiver: &protocol.ServerEndpoint{
+							Address: net.NewIPOrDomain(net.LocalHostIP),
+							Port:    uint32(serverPort),
+							User:    &protocol.User{
+								Account: serial.ToTypedMessage(&vmess.Account{
+									Id: userID.String(),
+								}),
 							},
 						},
 					}),

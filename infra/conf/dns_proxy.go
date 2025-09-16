@@ -13,7 +13,7 @@ type DNSOutboundConfig struct {
 	Port       uint16   `json:"port"`
 	UserLevel  uint32   `json:"userLevel"`
 	NonIPQuery string   `json:"nonIPQuery"`
-	BlockTypes  []int32  `json:"blockTypes"`
+	BlockTypes []int32  `json:"blockTypes"`
 }
 
 func (c *DNSOutboundConfig) Build() (proto.Message, error) {
@@ -28,9 +28,7 @@ func (c *DNSOutboundConfig) Build() (proto.Message, error) {
 		config.Server.Address = c.Address.Build()
 	}
 	switch c.NonIPQuery {
-	case "":
-		c.NonIPQuery = "drop"
-	case "drop", "skip":
+	case "", "reject", "drop", "skip":
 	default:
 		return nil, errors.New(`unknown "nonIPQuery": `, c.NonIPQuery)
 	}
