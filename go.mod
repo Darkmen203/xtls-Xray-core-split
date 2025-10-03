@@ -11,7 +11,7 @@ require (
 	github.com/miekg/dns v1.1.68
 	github.com/pelletier/go-toml v1.9.5
 	github.com/pires/go-proxyproto v0.8.1
-	github.com/quic-go/quic-go v0.54.0
+	github.com/quic-go/quic-go v0.55.0
 	github.com/refraction-networking/utls v1.8.0
 	github.com/sagernet/sing v0.7.6
 	github.com/sagernet/sing-shadowsocks v0.2.9
@@ -37,7 +37,6 @@ require (
 	github.com/andybalholm/brotli v1.0.6 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dgryski/go-metro v0.0.0-20200812162917-85c65e2d0165 // indirect
-	github.com/francoispqt/gojay v1.2.13 // indirect
 	github.com/google/btree v1.1.2 // indirect
 	github.com/juju/ratelimit v1.0.2 // indirect
 	github.com/klauspost/compress v1.17.4 // indirect
@@ -47,7 +46,6 @@ require (
 	github.com/quic-go/qpack v0.5.1 // indirect
 	github.com/riobard/go-bloom v0.0.0-20200614022211-cdc8013cb5b3 // indirect
 	github.com/vishvananda/netns v0.0.5 // indirect
-	go.uber.org/mock v0.5.0 // indirect
 	golang.org/x/mod v0.27.0 // indirect
 	golang.org/x/text v0.29.0 // indirect
 	golang.org/x/time v0.7.0 // indirect
